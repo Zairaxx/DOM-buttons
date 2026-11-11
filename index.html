@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOM-gissningen – vilken knapp kör vilken funktion?</title>
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1f1d1a;
+    --muted: #6b665e;
+    --line: #e2ddd3;
+    --accent: #2f5bd3;
+    --ok: #1f8a4c;
+    --bad: #c23b2a;
+    --code-bg: #1e1f24;
+    --code-ink: #e6e6e6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    transition: background .3s, color .3s;
+  }
+  header.app {
+    padding: 20px 24px 8px;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+  header.app h2 { margin: 0 0 4px; font-size: 1.4rem; }
+  header.app p { margin: 0; color: var(--muted); }
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+    padding: 16px 24px 40px;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .panel > h3 {
+    margin: 0 0 12px;
+    font-size: .8rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* --- Scenen som funktionerna ändrar --- */
+  #scen {
+    border: 2px dashed var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 18px;
+    min-height: 260px;
+  }
+  #titel { margin: 0 0 6px; font-size: 1.8rem; }
+  .intro { margin: 0 0 12px; color: var(--muted); }
+  #elever { margin: 0 0 14px; padding-left: 20px; }
+  #boxar { display: flex; flex-wrap: wrap; gap: 10px; }
+  .box {
+    width: 64px; height: 64px;
+    background: #d9d4c8;
+    border-radius: 6px;
+    transition: all .3s;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: #1f1d1a;
+  }
+
+  /* Mörkt läge som en av funktionerna slår på */
+  body.dark { --bg: #17181c; --panel: #23252b; --ink: #f1efe9; --muted: #a8a49b; --line: #3a3d45; }
+
+  /* --- Knapparna --- */
+  .knappar {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .knapp-kort {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .knapp-kort.ratt { border-color: var(--ok); box-shadow: 0 0 0 2px var(--ok) inset; }
+  .knapp-kort.fel { border-color: var(--bad); box-shadow: 0 0 0 2px var(--bad) inset; }
+  .kor {
+    font: inherit; font-weight: 600;
+    padding: 10px;
+    border: 0; border-radius: 8px;
+    background: var(--accent); color: #fff;
+    cursor: pointer;
+  }
+  .kor:hover { filter: brightness(1.1); }
+  .kor:active { transform: translateY(1px); }
+  .knapp-kort select {
+    font: inherit; padding: 6px;
+    border-radius: 6px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink);
+  }
+  .facit-text { font-size: .85rem; min-height: 1.2em; }
+  .facit-text.ratt { color: var(--ok); }
+  .facit-text.fel { color: var(--bad); }
+
+  .verktyg {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+  }
+  .verktyg button {
+    font: inherit; padding: 8px 14px;
+    border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink); cursor: pointer;
+  }
+  .verktyg button.primar { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  #poang { font-weight: 700; margin-left: auto; }
+
+  /* --- Koden --- */
+  .funktioner { display: flex; flex-direction: column; gap: 12px; }
+  .funktion h4 { margin: 0 0 4px; font-size: .95rem; }
+  pre {
+    margin: 0;
+    background: var(--code-bg); color: var(--code-ink);
+    padding: 12px 14px; border-radius: 8px;
+    overflow-x: auto;
+    font: 13.5px/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .kw { color: #c792ea; }
+  .str { color: #c3e88d; }
+  .fn { color: #82aaff; }
+  .num { color: #f78c6c; }
+  .com { color: #7f848e; font-style: italic; }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <h2>DOM-gissningen</h2>
+  <p>Klicka på knapparna och se vad som händer. Läs funktionerna A–J till höger och gissa vilken funktion varje knapp kör. Klicka sedan på <b>Rätta</b>.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h3>Sidan</h3>
+
+    <!-- Det här är elementen som funktionerna ändrar -->
+    <div id="scen">
+      <h1 id="titel">Välkommen till klassrummet</h1>
+      <p class="intro">Idag ska vi lära oss om DOM:en.</p>
+      <ul id="elever">
+        <li>Ali</li>
+        <li>Sara</li>
+        <li>Noah</li>
+        <li>Maja</li>
+      </ul>
+      <div id="boxar">
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+      </div>
+    </div>
+
+    <div class="knappar" id="knappar"></div>
+
+    <div class="verktyg">
+      <button class="primar" id="ratta">Rätta</button>
+      <button id="visa-facit">Visa facit</button>
+      <button id="aterstall">Återställ sidan</button>
+      <span id="poang"></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>Funktionerna</h3>
+    <div class="funktioner" id="funktioner"></div>
+  </section>
+</main>
+
+<script>
+  // ==========================================================
+  //  Funktionerna eleverna ska koppla till rätt knapp.
+  //  Koden som visas på sidan är exakt den kod som körs.
+  // ==========================================================
+
+  function funktionA() {
+    const rubrik = document.querySelector("#titel");
+    rubrik.textContent = "DOM är kul!";
+    rubrik.style.color = "royalblue";
+    rubrik.style.letterSpacing = "3px";
+
+    const intro = document.querySelector(".intro");
+    intro.textContent = "Rubriken ändrades av en knapp.";
+    intro.style.fontStyle = "italic";
+  }
+
+  function funktionB() {
+    const lista = document.getElementById("elever");
+    const antal = lista.children.length;
+
+    const li = document.createElement("li");
+    li.textContent = "Elev nummer " + (antal + 1);
+
+    if (antal % 2 === 0) {
+      li.style.color = "green";
+    } else {
+      li.style.color = "orange";
+    }
+
+    lista.appendChild(li);
+  }
+
+  function funktionC() {
+    const boxar = document.querySelectorAll(".box");
+
+    boxar.forEach((box, index) => {
+      box.textContent = index + 1;
+
+      if (index % 2 === 0) {
+        box.style.backgroundColor = "tomato";
+      } else {
+        box.style.backgroundColor = "gold";
+      }
+    });
+  }
+
+  function funktionD() {
+    document.body.classList.toggle("dark");
+    const intro = document.querySelector(".intro");
+
+    if (document.body.classList.contains("dark")) {
+      intro.textContent = "Godnatt! 🌙";
+    } else {
+      intro.textContent = "God morgon! ☀️";
+    }
+  }
+
+  function funktionE() {
+    const lista = document.getElementById("elever");
+
+    if (lista.children.length > 0) {
+      lista.lastElementChild.remove();
+    }
+
+    if (lista.children.length === 0) {
+      const rubrik = document.querySelector("#titel");
+      rubrik.textContent = "Alla elever har gått hem";
+    }
+  }
+
+  function funktionF() {
+    const antalBoxar = document.querySelectorAll(".box").length;
+    const antalElever = document.querySelectorAll("#elever li").length;
+
+    const intro = document.querySelector(".intro");
+    intro.textContent = "Elever: " + antalElever + ", boxar: " + antalBoxar;
+
+    if (antalElever > antalBoxar) {
+      intro.style.color = "green";
+    } else {
+      intro.style.color = "red";
+    }
+  }
+
+  function funktionG() {
+    const boxar = document.querySelectorAll(".box");
+    const forsta = boxar[0];
+    const sista = boxar[boxar.length - 1];
+
+    forsta.style.borderRadius = "50%";
+    sista.style.transform = "rotate(45deg)";
+    sista.style.backgroundColor = "mediumpurple";
+  }
+
+  function funktionH() {
+    const lista = document.getElementById("elever");
+    const elever = Array.from(lista.children);
+
+    elever.reverse();
+
+    elever.forEach((elev) => {
+      elev.textContent = elev.textContent.toUpperCase();
+      lista.appendChild(elev);
+    });
+  }
+
+  function funktionI() {
+    const farger = ["tomato", "gold", "skyblue", "lightgreen", "plum"];
+    const slump = Math.floor(Math.random() * farger.length);
+
+    const box = document.createElement("div");
+    box.classList.add("box");
+    box.style.backgroundColor = farger[slump];
+
+    document.getElementById("boxar").appendChild(box);
+  }
+
+  function funktionJ() {
+    const elev = document.querySelector("#elever li:nth-child(2)");
+    elev.style.color = "purple";
+    elev.style.fontWeight = "bold";
+
+    if (!elev.textContent.includes("⭐")) {
+      elev.textContent = elev.textContent + " ⭐";
+    }
+  }
+
+  // ==========================================================
+  //  Appens logik (behöver inte visas för eleverna)
+  // ==========================================================
+
+  const funktioner = {
+    A: funktionA, B: funktionB, C: funktionC, D: funktionD, E: funktionE,
+    F: funktionF, G: funktionG, H: funktionH, I: funktionI, J: funktionJ
+  };
+
+  // Vilken funktion varje knapp (1–10) kör
+  const knappTillFunktion = ["G", "D", "J", "A", "I", "C", "F", "B", "H", "E"];
+
+  const startHTML = document.getElementById("scen").innerHTML;
+
+  // Visa funktionerna med enkel syntaxfärgning
+  function farglagg(kod) {
+    const esc = kod.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return esc.replace(
+      /("(?:[^"\\]|\\.)*")|\b(function|const|let|if|else|return|true|false)\b|\b(\d+%?)\b|(\.?[a-zA-Z_]\w*)(?=\()/g,
+      (m, str, kw, num, fn) => {
+        if (str) return '<span class="str">' + str + "</span>";
+        if (kw) return '<span class="kw">' + kw + "</span>";
+        if (num) return '<span class="num">' + num + "</span>";
+        if (fn) return '<span class="fn">' + fn + "</span>";
+        return m;
+      }
+    );
+  }
+
+  const funktionLista = document.getElementById("funktioner");
+  Object.entries(funktioner).forEach(([bokstav, fn]) => {
+    const wrap = document.createElement("div");
+    wrap.className = "funktion";
+    const rubrik = document.createElement("h4");
+    rubrik.textContent = "Funktion " + bokstav;
+    const pre = document.createElement("pre");
+    // Ta bort indraget som kommer från <script>-taggen
+    const rader = fn.toString().split("\n");
+    const indrag = Math.min(...rader.slice(1).filter((r) => r.trim()).map((r) => r.match(/^ */)[0].length));
+    const kod = [rader[0], ...rader.slice(1).map((r) => r.slice(indrag))].join("\n");
+    pre.innerHTML = farglagg(kod);
+    wrap.append(rubrik, pre);
+    funktionLista.appendChild(wrap);
+  });
+
+  // Skapa knapparna
+  const knappar = document.getElementById("knappar");
+  knappTillFunktion.forEach((bokstav, i) => {
+    const kort = document.createElement("div");
+    kort.className = "knapp-kort";
+
+    const knapp = document.createElement("button");
+    knapp.className = "kor";
+    knapp.textContent = "Knapp " + (i + 1);
+    knapp.addEventListener("click", () => {
+      try { funktioner[bokstav](); } catch (e) { console.error(e); }
+    });
+
+    const val = document.createElement("select");
+    val.innerHTML = '<option value="">Din gissning…</option>' +
+      Object.keys(funktioner).map((b) => '<option value="' + b + '">Funktion ' + b + "</option>").join("");
+    val.addEventListener("change", () => {
+      kort.classList.remove("ratt", "fel");
+      text.textContent = "";
+      text.className = "facit-text";
+    });
+
+    const text = document.createElement("div");
+    text.className = "facit-text";
+
+    kort.append(knapp, val, text);
+    knappar.appendChild(kort);
+  });
+
+  function ratta(visaFacit) {
+    let ratt = 0;
+    document.querySelectorAll(".knapp-kort").forEach((kort, i) => {
+      const facit = knappTillFunktion[i];
+      const val = kort.querySelector("select");
+      const text = kort.querySelector(".facit-text");
+      if (visaFacit) val.value = facit;
+      const ok = val.value === facit;
+      if (ok) ratt++;
+      kort.classList.remove("ratt", "fel");
+      kort.classList.add(ok ? "ratt" : "fel");
+      text.className = "facit-text " + (ok ? "ratt" : "fel");
+      text.textContent = ok ? "✓ Rätt!" : (val.value ? "✗ Inte " + val.value : "✗ Ingen gissning");
+    });
+    document.getElementById("poang").textContent = ratt + " / 10 rätt";
+  }
+
+  document.getElementById("ratta").addEventListener("click", () => ratta(false));
+  document.getElementById("visa-facit").addEventListener("click", () => ratta(true));
+  document.getElementById("aterstall").addEventListener("click", () => {
+    document.getElementById("scen").innerHTML = startHTML;
+    document.body.classList.remove("dark");
+  });
+</script>
+</body>
+</html>
