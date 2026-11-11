@@ -56,6 +56,25 @@
     color: var(--muted);
   }
 
+  .sid-huvud {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 12px;
+  }
+  .sid-huvud h3 {
+    margin: 0; font-size: .8rem; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  #aterstall {
+    font: inherit; font-weight: 700;
+    padding: 10px 18px;
+    border: 0; border-radius: 999px;
+    background: #e8590c; color: #fff;
+    cursor: pointer;
+    box-shadow: 0 2px 0 rgba(0,0,0,.15);
+  }
+  #aterstall:hover { background: #d9480f; }
+  #aterstall:active { transform: translateY(1px); }
+
   /* --- Scenen som funktionerna ändrar --- */
   #scen {
     border: 2px dashed var(--line);
@@ -155,7 +174,10 @@
 
 <main>
   <section class="panel">
-    <h3>Sidan</h3>
+    <div class="sid-huvud">
+      <h3>Sidan</h3>
+      <button id="aterstall" title="Ställer tillbaka sidan som den var från början">↺ Återställ sidan</button>
+    </div>
 
     <!-- Det här är elementen som funktionerna ändrar -->
     <div id="scen">
@@ -178,8 +200,6 @@
 
     <div class="verktyg">
       <button class="primar" id="ratta">Rätta</button>
-      <button id="visa-facit">Visa facit</button>
-      <button id="aterstall">Återställ sidan</button>
       <span id="poang"></span>
     </div>
   </section>
@@ -392,13 +412,12 @@
     knappar.appendChild(kort);
   });
 
-  function ratta(visaFacit) {
+  function ratta() {
     let ratt = 0;
     document.querySelectorAll(".knapp-kort").forEach((kort, i) => {
       const facit = knappTillFunktion[i];
       const val = kort.querySelector("select");
       const text = kort.querySelector(".facit-text");
-      if (visaFacit) val.value = facit;
       const ok = val.value === facit;
       if (ok) ratt++;
       kort.classList.remove("ratt", "fel");
@@ -409,8 +428,7 @@
     document.getElementById("poang").textContent = ratt + " / 10 rätt";
   }
 
-  document.getElementById("ratta").addEventListener("click", () => ratta(false));
-  document.getElementById("visa-facit").addEventListener("click", () => ratta(true));
+  document.getElementById("ratta").addEventListener("click", ratta);
   document.getElementById("aterstall").addEventListener("click", () => {
     document.getElementById("scen").innerHTML = startHTML;
     document.body.classList.remove("dark");
